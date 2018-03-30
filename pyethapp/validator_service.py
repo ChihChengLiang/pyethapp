@@ -85,7 +85,7 @@ class ValidatorService(BaseService):
             log.debug('The validator hasn\'t deposited funds and we have no intention to, so return!')
             return
         # (2) Check if the validator is logged in
-        if not self.is_logged_in(casper, casper.get_current_epoch(), validator_index):
+        if not self.is_logged_in(casper, casper.current_epoch(), validator_index):
             log.debug('The validator is not logged in')
             return
 
@@ -169,9 +169,9 @@ class ValidatorService(BaseService):
             log.info('Validator is already deleted!')
             self.set_current_state(ValidatorState.logged_out)
             return
-        end_epoch = casper.get_dynasty_start_epoch(casper.get_validators__end_dynasty(vindex) + 1)
+        end_epoch = casper.dynasty_start_epoch(casper.validators__end_dynasty(vindex) + 1)
         # Check Casper to see if we can withdraw
-        if casper.get_current_epoch() >= end_epoch + casper.get_withdrawal_delay():
+        if casper.current_epoch() >= end_epoch + casper.withdrawal_delay():
             # Make withdraw tx & broadcast
             withdraw_tx = self.mk_withdraw_tx(self.get_validator_index(casper))
             self.chainservice.broadcast_transaction(withdraw_tx)
@@ -180,20 +180,20 @@ class ValidatorService(BaseService):
 
     def check_withdrawn(self, casper):
         # Check that we have been withdrawn--validator index will now be zero
-        if casper.get_validator_indexes(self.coinbase.address) == 0:
+        if casper.validator_indexes(self.coinbase.address) == 0:
             self.set_current_state(ValidatorState.logged_out)
 
     def log_casper_info(self, casper):
-        ce = casper.get_current_epoch()
-        ese = casper.get_expected_source_epoch()
+        ce = casper.current_epoch()
+        ese = casper.expected_source_epoch()
         cur_deposits = casper.get_total_curdyn_deposits()
         prev_deposits = casper.get_total_prevdyn_deposits()
-        cur_votes = casper.get_votes__cur_dyn_votes(ce, ese) * casper.get_deposit_scale_factor(ce)
-        prev_votes = casper.get_votes__prev_dyn_votes(ce, ese) * casper.get_deposit_scale_factor(ce)
+        cur_votes = casper.votes__cur_dyn_votes(ce, ese) * casper.deposit_scale_factor(ce)
+        prev_votes = casper.votes__prev_dyn_votes(ce, ese) * casper.deposit_scale_factor(ce)
         cur_vote_pct = cur_votes * 100 / cur_deposits if cur_deposits else 0
         prev_vote_pct = prev_votes * 100 / prev_deposits if prev_deposits else 0
-        last_finalized_epoch, last_justified_epoch = casper.get_last_finalized_epoch(), casper.get_last_justified_epoch()
-        last_nonvoter_rescale, last_voter_rescale = casper.get_last_nonvoter_rescale(), casper.get_last_voter_rescale()
+        last_finalized_epoch, last_justified_epoch = casper.last_finalized_epoch(), casper.last_justified_epoch()
+        last_nonvoter_rescale, last_voter_rescale = casper.last_nonvoter_rescale(), casper.last_voter_rescale()
         log.info('CASPER STATUS: epoch %d, %.3f / %.3f ETH (%.2f %%) voted from current dynasty, '
                  '%.3f / %.3f ETH (%.2f %%) voted from previous dynasty, last finalized epoch %d justified %d '
                  'expected source %d. Nonvoter deposits last rescaled %.5fx, voter deposits %.5fx' %
@@ -205,13 +205,13 @@ class ValidatorService(BaseService):
 
     def log_validator_info(self, casper):
         index = self.get_validator_index(casper)
-        address = casper.get_validators__addr(index)
-        deposit_unscaled = casper.get_validators__deposit(index)
-        ce = casper.get_current_epoch()
-        deposit_scaled = deposit_unscaled * casper.get_deposit_scale_factor(ce)
-        start_dynasty = casper.get_validators__start_dynasty(index)
-        end_dynasty = casper.get_validators__end_dynasty(index)
-        withdrawal_addr = casper.get_validators__withdrawal_addr(index)
+        address = casper.validators__addr(index)
+        deposit_unscaled = casper.validators__deposit(index)
+        ce = casper.current_epoch()
+        deposit_scaled = deposit_unscaled * casper.deposit_scale_factor(ce)
+        start_dynasty = casper.validators__start_dynasty(index)
+        end_dynasty = casper.validators__end_dynasty(index)
+        withdrawal_addr = casper.validators__withdrawal_addr(index)
         log.info('Validator Status:', index=index, address=address,
             deposit_unscaled=deposit_unscaled / 10**18,
             deposit_scaled=deposit_scaled / 10**18,
@@ -265,9 +265,9 @@ class ValidatorService(BaseService):
         return tx
 
     def is_logged_in(self, casper, target_epoch, validator_index):
-        start_dynasty = casper.get_validators__start_dynasty(validator_index)
-        end_dynasty = casper.get_validators__end_dynasty(validator_index)
-        current_dynasty = casper.get_dynasty_in_epoch(target_epoch)
+        start_dynasty = casper.validators__start_dynasty(validator_index)
+        end_dynasty = casper.validators__end_dynasty(validator_index)
+        current_dynasty = casper.dynasty_in_epoch(target_epoch)
         past_dynasty = current_dynasty - 1
         in_current_dynasty = ((start_dynasty <= current_dynasty) and
                               (current_dynasty < end_dynasty))
@@ -278,18 +278,18 @@ class ValidatorService(BaseService):
 
     def get_validator_index(self, casper):
         try:
-            return casper.get_validator_indexes(self.coinbase.address)
+            return casper.validator_indexes(self.coinbase.address)
         except tester.TransactionFailed:
             return None
 
     def recommended_vote_contents(self, casper, validator_index):
-        current_epoch = casper.get_current_epoch()
+        current_epoch = casper.current_epoch()
         if current_epoch == 0:
             return None, None, None
         # NOTE: Using `epoch_blockhash` because currently calls to `blockhash` within contracts
         # in the ephemeral state are off by one, so we can't use `get_recommended_target_hash()` :(
         target_hash = self.epoch_blockhash(current_epoch)
-        source_epoch = casper.get_recommended_source_epoch()
+        source_epoch = casper.recommended_source_epoch()
         return target_hash, current_epoch, source_epoch
 
     def epoch_blockhash(self, epoch):

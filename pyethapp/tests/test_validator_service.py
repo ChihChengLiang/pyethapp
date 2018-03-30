@@ -125,7 +125,7 @@ def test_valcode_deployment_and_successful_deposit(test, test_app):
     test.t.direct_tx(transaction_queue.pop())
     test.parse('B1')
     # Check that the validator has been added to the validator list
-    validator_index = test.casper.get_validator_indexes(validator.coinbase.address)
+    validator_index = test.casper.validator_indexes(validator.coinbase.address)
     assert validator_index > 0
     print('Validator logged in with index: {}'.format(validator_index))
 
@@ -143,11 +143,11 @@ def test_vote_after_logged_in(test, test_app):
     test.t.direct_tx(transaction_queue.pop())
     test.parse('B1')
     # Get info required to check if the vote went through
-    current_epoch = test.casper.get_current_epoch()
-    expected_source_epoch = test.casper.get_expected_source_epoch()
-    deposit = test.deposit_size / test.casper.get_deposit_scale_factor(current_epoch)
+    current_epoch = test.casper.current_epoch()
+    expected_source_epoch = test.casper.expected_source_epoch()
+    deposit = test.deposit_size / test.casper.deposit_scale_factor(current_epoch)
     # Check that the vote was counted
-    assert test.casper.get_votes__cur_dyn_votes(current_epoch, expected_source_epoch) == deposit
+    assert test.casper.votes__cur_dyn_votes(current_epoch, expected_source_epoch) == deposit
     print('Validator submitted proper vote')
 
 def test_validator_logout_and_withdrawal(test, test_app):
